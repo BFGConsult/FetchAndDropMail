@@ -47,8 +47,7 @@ class FetchEmail():
         self.connection = imaplib.IMAP4_SSL(mail_server, port)
 
         self.connection.login(username, password)
-        self.connection.select(readonly=readonly) # so we can mark mails as read
-        #self.connection.select(readonly=True) # For testing
+        self.connection.select(readonly=readonly)
 
     def close_connection(self):
         """
