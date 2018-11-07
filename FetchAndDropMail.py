@@ -2,11 +2,24 @@
 
 import email, getopt, imaplib, os, os.path, sys, tempfile, yaml
 
+import signal
+#imaplib.Debug = 4
+
+def cleanup():
+    os.rmdir(dirpath)
+
+def signal_handler(sig, frame):
+    print('You pressed Ctrl+C!')
+    fConn.done()
+    cleanup()
+    sys.exit(0)
+
+
 def usage(progName):
     print "Usage is\n\t%s [-c CONFFILE]" % (progName)
 
 try:
-    opts, args = getopt.getopt(sys.argv[1:], 'c:t')
+    opts, args = getopt.getopt(sys.argv[1:], 'c:dtq')
 except getopt.GetoptError as err:
         # print help information and exit:
         print str(err)  # will print something like "option -a not recognized"
@@ -16,12 +29,19 @@ except getopt.GetoptError as err:
 home = os.path.expanduser("~")
 conffiles=["FetchAndDropMail.yml", os.path.join(home, ".FetchAndDropMail.yml"),  None]
 testmode=False
+daemon=False
+quiet=False
+
 
 for o, a in opts:
     if o == "-c":
         conffiles=[a, None]
-    if o == "-t":
+    elif o == "-d":
+        daemon=True
+    elif o == "-t":
         testmode=True
+    elif o == "-q":
+        quiet=True
 
 
 for fname in conffiles:
@@ -47,13 +67,33 @@ class FetchEmail():
         self.connection = imaplib.IMAP4_SSL(mail_server, port)
 
         self.connection.login(username, password)
-        self.connection.select(readonly=readonly)
+        self.readonly=readonly
+
+    def __del__(self):
+        self.connection.logout()
 
     def close_connection(self):
         """
         Close the connection to the IMAP server
         """
         self.connection.close()
+
+    def done(self):
+        self.connection.send("%s DONE\r\n"%(self.connection._new_tag()))
+
+    def idle(self):
+        self.connection.send("%s IDLE\r\n"%(self.connection._new_tag()))
+        print ">>> waiting for new mail..."
+        while True:
+            line = self.connection.readline().strip();
+            if line.startswith('* BYE ') or (len(line) == 0):
+                print ">>> leaving..."
+                break
+            if line.endswith('EXISTS'):
+                print ">>> NEW MAIL ARRIVED!"
+                self.done()
+                return
+
 
     def save_attachment(self, msg, download_folder="/tmp"):
         """
@@ -82,22 +122,25 @@ class FetchEmail():
         """
         Retrieve unread messages
         """
+        self.connection.select(readonly=self.readonly)
         emails = []
         (result, messages) = self.connection.search(None, 'UnSeen')
         if result == "OK":
-            for message in messages[0].split(' '):
-                try: 
-                    ret, data = self.connection.fetch(message,'(RFC822)')
-                except:
-                    self.close_connection()
-                    raise Exception("No new emails to read.")
+            if len(messages[0])>0:
+                for message in messages[0].split(' '):
+                    try:
+                        print 'try'
+                        ret, data = self.connection.fetch(message,'(RFC822)')
+                    except:
+                        self.close_connection()
+                        raise Exception("No new emails to read.")
 
 
-                #msg = email.message_from_bytes(data[0][1])
-                msg = email.message_from_string(data[0][1])
-                if isinstance(msg, str) == False:
-                    emails.append(msg)
-                response, data = self.connection.store(message, '+FLAGS','\\Seen')
+                    #msg = email.message_from_bytes(data[0][1])
+                    msg = email.message_from_string(data[0][1])
+                    if isinstance(msg, str) == False:
+                        emails.append(msg)
+                        response, data = self.connection.store(message, '+FLAGS','\\Seen')
 
             return emails
 
@@ -112,43 +155,63 @@ class FetchEmail():
         """
         return email.utils.parseaddr(email_address)
 
-f=FetchEmail(
+fConn=FetchEmail(
     cfg['imap']['host'],
     cfg['imap']['username'],
     cfg['imap']['password'],
     993,
     testmode
     )
+
+
 try:
-    emails=f.fetch_unread_messages()
+    emails=fConn.fetch_unread_messages()
 except Exception as e:
     exit()
 dirpath = tempfile.mkdtemp()
 
+#fConn.idle()
+first=True
+loop=True
 nAttach=[]
 dropped=[]
-for mail in emails:
-    f.save_attachment(mail, dirpath)
-    onlyfiles = [f for f in os.listdir(dirpath) if os.path.isfile(os.path.join(dirpath, f))]
-    for f in onlyfiles:
-        fparts = os.path.splitext(f)
-        extension=fparts[1][1:]
-        prefix = fparts[0]
-        if extension in ('pdf'):
-            otarget=os.path.join(destdir,prefix)
-            src=os.path.join(dirpath,f)
-            ntarget=otarget+'.'+extension
-            n=0
-            while os.path.exists(ntarget):
-                print 'File already exists' + ntarget
-                n+=1
-                ntarget=otarget+'-'+str(n)+'.'+extension
+while loop:
+    for mail in emails:
+        fConn.save_attachment(mail, dirpath)
+        onlyfiles = [f for f in os.listdir(dirpath) if os.path.isfile(os.path.join(dirpath, f))]
+        for f in onlyfiles:
+            fparts = os.path.splitext(f)
+            extension=fparts[1][1:]
+            prefix = fparts[0]
+            if extension in ('pdf'):
+                otarget=os.path.join(destdir,prefix)
+                src=os.path.join(dirpath,f)
+                ntarget=otarget+'.'+extension
+                n=0
+                while os.path.exists(ntarget):
+                    print 'File already exists' + ntarget
+                    n+=1
+                    ntarget=otarget+'-'+str(n)+'.'+extension
+                else:
+                    os.rename(src,ntarget)
+                    nAttach.append(ntarget)
             else:
-                os.rename(src,ntarget)
-                nAttach.append(ntarget)
-        else:
-            os.unlink(f)
-            droppeed.append(f)
-print nAttach
-print dropped
-os.rmdir(dirpath)
+                os.unlink(f)
+                droppeed.append(f)
+    if daemon:
+        if first:
+            signal.signal(signal.SIGINT, signal_handler)
+            first=False
+
+        fConn.idle()
+        try:
+            emails=fConn.fetch_unread_messages()
+        except Exception as e:
+            exit()
+    else:
+        loop=False
+
+if not quiet:
+    print nAttach
+    print dropped
+cleanup()
