@@ -183,9 +183,9 @@ while loop:
             fparts = os.path.splitext(f)
             extension=fparts[1][1:]
             prefix = fparts[0]
+            src=os.path.join(dirpath,f)
             if extension in ('pdf'):
                 otarget=os.path.join(destdir,prefix)
-                src=os.path.join(dirpath,f)
                 ntarget=otarget+'.'+extension
                 n=0
                 while os.path.exists(ntarget):
@@ -194,10 +194,10 @@ while loop:
                     ntarget=otarget+'-'+str(n)+'.'+extension
                 else:
                     os.rename(src,ntarget)
-                    nAttach.append(ntarget)
+                    nAttach.append((f, ntarget))
             else:
-                os.unlink(f)
-                droppeed.append(f)
+                os.unlink(src)
+                dropped.append(f)
     if daemon:
         if first:
             signal.signal(signal.SIGINT, signal_handler)
@@ -212,6 +212,12 @@ while loop:
         loop=False
 
 if not quiet:
-    print nAttach
-    print dropped
+    if nAttach:
+        print 'Queued the following attachements:'
+        for (file, target) in nAttach:
+            print "\t%s as %s" % (file, target)
+    if dropped:
+        print 'The following attachements were not recognized:'
+        for file in dropped:
+            print "\t%s" % (file)
 cleanup()
