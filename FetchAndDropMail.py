@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python
 
 import email, getopt, imaplib, os, os.path, sys, tempfile, yaml
 
