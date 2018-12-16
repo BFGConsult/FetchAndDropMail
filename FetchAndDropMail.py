@@ -19,7 +19,7 @@ def usage(progName):
     print "Usage is\n\t%s [-c CONFFILE]" % (progName)
 
 try:
-    opts, args = getopt.getopt(sys.argv[1:], 'c:dtq')
+    opts, args = getopt.getopt(sys.argv[1:], 'c:dtqv')
 except getopt.GetoptError as err:
         # print help information and exit:
         print str(err)  # will print something like "option -a not recognized"
@@ -31,6 +31,7 @@ conffiles=["FetchAndDropMail.yml", os.path.join(home, ".FetchAndDropMail.yml"), 
 testmode=False
 daemon=False
 quiet=False
+verbose=False
 
 
 for o, a in opts:
@@ -42,6 +43,8 @@ for o, a in opts:
         testmode=True
     elif o == "-q":
         quiet=True
+    elif o == "-v":
+        verbose=True
 
 
 for fname in conffiles:
@@ -129,7 +132,8 @@ class FetchEmail():
             if len(messages[0])>0:
                 for message in messages[0].split(' '):
                     try:
-                        print 'try'
+                        if verbose:
+                            print 'Try Fetch'
                         ret, data = self.connection.fetch(message,'(RFC822)')
                     except:
                         self.close_connection()
@@ -167,8 +171,12 @@ fConn=FetchEmail(
 try:
     emails=fConn.fetch_unread_messages()
 except Exception as e:
+    print 'Error reading messages'
     exit()
 dirpath = tempfile.mkdtemp()
+
+if verbose:
+    print emails
 
 #fConn.idle()
 first=True
