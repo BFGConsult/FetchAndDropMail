@@ -1,0 +1,6 @@
+imap:
+  host: imap.example.com
+  username: <username>
+  password: <password>
+dest:
+  dir: <destdir>
