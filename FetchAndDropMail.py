@@ -79,8 +79,18 @@ class FetchEmail():
     def __init__(self, mail_server, username, password, port=0, readonly=False):
         if port==0:
             port=993
-
-        self.connection = imaplib.IMAP4_SSL(mail_server, port)
+        try:
+            self.connection = imaplib.IMAP4_SSL(mail_server, port)
+        except Exception as e:
+            t, v, tb = sys.exc_info()
+            print 't:'
+            print t
+            print 'v:'
+            print v
+            print 'tb:'
+            print tb
+            #Reraise the exception
+            raise t, v, tb
 
         self.connection.login(username, password)
         self.readonly=readonly
