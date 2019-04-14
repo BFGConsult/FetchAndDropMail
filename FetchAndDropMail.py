@@ -1,9 +1,21 @@
 #!/usr/bin/env python
 
-import email, getopt, imaplib, os, os.path, sys, tempfile, yaml
-
+import getopt, imaplib, os, os.path, sys, tempfile, yaml, re
+import email, email.header, imaplib
 import signal
 #imaplib.Debug = 4
+
+#Decode email header according to RFC2822
+def decodeEmailHeader(filename):
+    if re.match('(=\?.*\?=)(?!$)', filename):
+        #Workaround for wrongly encoded filenames
+        filename = re.sub(r"(=\?.*\?=)(?!$)", r"\1 ", filename)
+
+        filename = email.header.decode_header(filename)
+        if len(filename) > 1:
+            raise NotImplementedError("Don't know if this occurs in real world examples.")
+        filename = filename[0][0].decode(filename[0][1])
+    return filename
 
 def cleanup():
     os.rmdir(dirpath)
@@ -67,6 +79,7 @@ class FetchEmail():
     def __init__(self, mail_server, username, password, port=0, readonly=False):
         if port==0:
             port=993
+
         self.connection = imaplib.IMAP4_SSL(mail_server, port)
 
         self.connection.login(username, password)
@@ -188,7 +201,8 @@ while loop:
         fConn.save_attachment(mail, dirpath)
         onlyfiles = [f for f in os.listdir(dirpath) if os.path.isfile(os.path.join(dirpath, f))]
         for f in onlyfiles:
-            fparts = os.path.splitext(f)
+            decodedName = decodeEmailHeader(f)
+            fparts = os.path.splitext(decodedName)
             extension=fparts[1][1:]
             prefix = fparts[0]
             src=os.path.join(dirpath,f)
