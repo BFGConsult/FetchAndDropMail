@@ -67,7 +67,7 @@ for fname in conffiles:
         break
 
 with open(fname, 'r') as ymlfile:
-    cfg = yaml.load(ymlfile)
+    cfg = yaml.safe_load(ymlfile)
 
 destdir = cfg['dest']['dir']
 
@@ -136,12 +136,16 @@ class FetchEmail():
                 continue
 
             filename = part.get_filename()
-            att_path = os.path.join(download_folder, filename)
+            if not filename:
+                print ('Encountered a multipart I could not handle:')
+                print (filename)
+            else:
+                att_path = os.path.join(download_folder, filename)
 
-            if not os.path.isfile(att_path):
-                fp = open(att_path, 'wb')
-                fp.write(part.get_payload(decode=True))
-                fp.close()
+                if not os.path.isfile(att_path):
+                    fp = open(att_path, 'wb')
+                    fp.write(part.get_payload(decode=True))
+                    fp.close()
         return att_path
 
     def fetch_unread_messages(self):
@@ -208,6 +212,7 @@ nAttach=[]
 dropped=[]
 while loop:
     for mail in emails:
+        print (dirpath)
         fConn.save_attachment(mail, dirpath)
         onlyfiles = [f for f in os.listdir(dirpath) if os.path.isfile(os.path.join(dirpath, f))]
         for f in onlyfiles:
