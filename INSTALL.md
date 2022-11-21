@@ -13,3 +13,9 @@ I usually use [homebrew](https://brew.sh/) in this case, just install python2 an
 
 `brew install python@2`
 `pip install pyyaml`
+
+# Linux
+
+## Debian
+All that should be needed to run this package is
+`apt install python3-yaml`
