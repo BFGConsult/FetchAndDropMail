@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 import getopt, imaplib, os, os.path, sys, tempfile, yaml, re
 import email, email.header, imaplib
@@ -28,13 +28,13 @@ def signal_handler(sig, frame):
 
 
 def usage(progName):
-    print "Usage is\n\t%s [-c CONFFILE]" % (progName)
+    print ("Usage is\n\t%s [-c CONFFILE]") % (progName)
 
 try:
     opts, args = getopt.getopt(sys.argv[1:], 'c:dtqv')
 except getopt.GetoptError as err:
         # print help information and exit:
-        print str(err)  # will print something like "option -a not recognized"
+        print (str(err))  # will print something like "option -a not recognized"
         usage(sys.argv[0])
         sys.exit(2)
 
@@ -61,7 +61,7 @@ for o, a in opts:
 
 for fname in conffiles:
     if not fname:
-        print 'No configuration file found'
+        print ('No configuration file found')
         exit(1)
     if os.path.isfile(fname):
         break
@@ -83,20 +83,22 @@ class FetchEmail():
             self.connection = imaplib.IMAP4_SSL(mail_server, port)
         except Exception as e:
             t, v, tb = sys.exc_info()
-            print 't:'
-            print t
-            print 'v:'
-            print v
-            print 'tb:'
-            print tb
+            print ('t:')
+            print (t)
+            print ('v:')
+            print (v)
+            print ('tb:')
+            print (tb)
             #Reraise the exception
-            raise t, v, tb
+            raise (t, v, tb)
 
         self.connection.login(username, password)
         self.readonly=readonly
 
     def __del__(self):
-        self.connection.logout()
+        pass
+        #Causes a crash in Python3, possibly because it's not needed
+        #self.connection.logout()
 
     def close_connection(self):
         """
@@ -109,14 +111,14 @@ class FetchEmail():
 
     def idle(self):
         self.connection.send("%s IDLE\r\n"%(self.connection._new_tag()))
-        print ">>> waiting for new mail..."
+        print (">>> waiting for new mail...")
         while True:
             line = self.connection.readline().strip();
             if line.startswith('* BYE ') or (len(line) == 0):
-                print ">>> leaving..."
+                print (">>> leaving...")
                 break
             if line.endswith('EXISTS'):
-                print ">>> NEW MAIL ARRIVED!"
+                print (">>> NEW MAIL ARRIVED!")
                 self.done()
                 return
 
@@ -160,7 +162,7 @@ class FetchEmail():
                 for message in messages[0].split(' '):
                     try:
                         if verbose:
-                            print 'Try Fetch'
+                            print ('Try Fetch')
                         ret, data = self.connection.fetch(message,'(RFC822)')
                     except:
                         self.close_connection()
@@ -198,12 +200,12 @@ fConn=FetchEmail(
 try:
     emails=fConn.fetch_unread_messages()
 except Exception as e:
-    print 'Error reading messages'
+    print ('Error reading messages')
     exit()
 dirpath = tempfile.mkdtemp()
 
 if verbose:
-    print emails
+    print (emails)
 
 #fConn.idle()
 first=True
@@ -226,7 +228,7 @@ while loop:
                 ntarget=otarget+'.'+extension
                 n=0
                 while os.path.exists(ntarget):
-                    print 'File already exists' + ntarget
+                    print ('File already exists' + ntarget)
                     n+=1
                     ntarget=otarget+'-'+str(n)+'.'+extension
                 else:
@@ -250,11 +252,11 @@ while loop:
 
 if not quiet:
     if nAttach:
-        print 'Queued the following attachements:'
+        print ('Queued the following attachements:')
         for (file, target) in nAttach:
-            print "\t%s as %s" % (file, target)
+            print ("\t%s as %s" % (file, target))
     if dropped:
-        print 'The following attachements were not recognized:'
+        print ('The following attachements were not recognized:')
         for file in dropped:
-            print "\t%s" % (file)
+            print ("\t%s" % (file))
 cleanup()
